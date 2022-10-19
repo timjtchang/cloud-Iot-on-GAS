@@ -1,0 +1,532 @@
+<!-- Chart.js v2.9.3 -->
+<!-- Reference by https://codepen.io/pumii/pen/KKMwdVE?editors=1100 -->
+
+<!--
+	UI.html - An UI for RP cloud-iot course
+	Copyright © 2022 Realplus Tech.
+
+	Designed by Tim J. April/2022
+
+-->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
+<link href="dep/UI.css" rel="stylesheet" type="text/css">
+
+<head>
+	<title> 雲端物聯網監控介面 </title>
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	<script>
+		
+		var input = new Object();
+		input.id = 'null';
+		input.rgbr = '0';
+		input.rgbg = '0';
+		input.rgbb = '0';
+		input.humid = '0';
+		input.temp = '0';
+		input.buzzer = '0';
+		input.sonar = '0';
+		input.relay = '0';
+		
+		var tempQueue = new Array();
+		var humidQueue = new Array();
+		var colorLabel = [ "Red", "Green", "Blue" ];
+		
+		var userId = 'NULL';
+		
+		var trigger;
+		
+		function implementData(){
+			
+			document.getElementById('temp_title').textContent = '溫度 Temperature '+input.temp+'°C';
+			document.getElementById('humid_title').textContent = '濕度 Humid '+input.humid+'%';
+			document.getElementById('buzzer_value').textContent = input.buzzer;
+			document.getElementById('sonar_value').textContent = input.sonar;
+			document.getElementById('relay_value').textContent = input.relay;
+			
+			if( tempQueue.length >= 10 ) tempQueue.shift();
+			tempQueue.push( input.temp );
+			
+			if( humidQueue.length >= 10 ) humidQueue.shift();
+			humidQueue.push( input.humid );
+			
+			var red = parseInt( input.rgbr );
+			var green = parseInt( input.rgbg);
+			var blue = parseInt( input.rgbb);
+			
+			if( red>255 || red<0 ){
+			
+				red = 0;
+				input.rgbr = '0';
+			} 
+			if( green>255 || green<0 ){
+				
+				green = 0;
+				input.rgbg = '0';
+			} 
+			
+			if( blue>255 || blue<0 ){
+				
+				blue = 0;
+				input.blue = '0';
+			} 
+			
+			colorLabel[0] = "Red ( "+input.rgbr+" )";
+			colorLabel[1] = "Green ( "+input.rgbg+" )";
+			colorLabel[2] = "Blue ( "+input.rgbb+" )";
+			
+			drawRGBChart();
+			drawTempChart();
+			drawHumidChart();
+			
+			var color = '#'+red.toString(16)+green.toString(16)+blue.toString(16);
+			
+			console.log( color, 16 );
+			document.getElementById('led-bar').style.backgroundColor = color;
+		
+		}
+		
+		function enterId(){
+			
+			clearInterval( trigger );
+			
+			console.log( 'in enter id');
+			userId = document.getElementById('enterId_input').value;
+			document.getElementById('presentId').textContent = userId;
+			
+			if( userId == '' ){
+				
+				alert("請輸入使用者名稱");
+				userId = 'NULL';
+				return;
+				
+			}else{
+				
+				input.id = userId;
+				input.rgbr = '0';
+				input.rgbg = '0';
+				input.rgbb = '0';
+				input.humid = '0';
+				input.temp = '0';
+				input.buzzer = '0';
+				input.sonar = '0';
+				input.relay = '0';
+				
+				tempQueue = [];
+				humidQueue = [];
+				
+				console.log( tempQueue );
+				console.log( humidQueue );
+			
+			} 
+			trigger = window.setInterval(getData, 1000 );
+			
+		}
+		
+		function clearAll( GASId ){
+				
+			document.getElementById("presentId").textContent = "清除中....";
+			$.get('https://script.google.com/macros/s/'+GASId+'/exec?mode=clear',function(e){
+				alert(e);
+				document.getElementById("presentId").textContent = "";
+			
+				userId = 'NULL';
+						
+			});
+			
+		
+		}
+		
+		function listId(){
+			
+			window.open('dep/listUI.html');
+		}
+		
+		function registerId(){
+			
+			userId = 'NULL';
+			clearInterval( trigger );
+			
+			console.log( 'in register id' );
+			var GASId = 'AKfycbxanjIWXuYsx3Xul3U5l2_QRVvKfzTIXFZjxhi4P3nxh31uGg5MosME05KWI6xsTybc';
+			document.getElementById("presentId").textContent = "註冊中....";
+			// to list id from data base
+			
+			var tmpId = document.getElementById("enterId_input").value;
+			
+			if( tmpId == 'rpclearall' ){
+				
+				clearAll( GASId );
+				return;
+			} 
+			
+			if( tmpId == '' ){
+				
+				alert("請輸入使用者名稱");
+				return;
+			} 
+			
+			var msg = 'https://script.google.com/macros/s/'+GASId+'/exec?mode=register&id=';
+			msg+=tmpId;
+			
+			$.get(msg,function(e){
+				alert(e);
+				trigger = window.setInterval(getData, 1000 );
+				userId = tmpId;
+				document.getElementById("presentId").textContent = userId;
+					
+			});
+			
+			
+			
+			return;
+		
+		}
+
+		function getData(){
+			
+			clearInterval( trigger );
+			
+			if( userId == 'NULL' || userId == '' ) return;
+			
+			for( key in input ){		// to initialize input as ''
+				
+				input[key] = '';
+			}
+			
+			// to get data from data base
+			
+			$.get('https://script.google.com/macros/s/AKfycbxBtaKiEUZrpXwmhteoxpO-bXzQaVrNNfnxnMGr_DcUoH3dpitwhAtMhpfdzZAUgI_h1Q/exec?mode=request&id='+userId,function(e){
+				
+				if( e[0] == '-' ){
+					
+					if( userId != 'NULL' && e.slice(1) == userId ){
+					
+						alert( "名稱"+userId+"尚未註冊，請先註冊" );
+						userId = 'NULL';
+						document.getElementById('presentId').textContent = '請輸入名稱後點選註冊';
+					
+					}
+
+					return;
+				}
+				
+				
+				console.log(e);
+				
+				var counter = 0;		
+				for( key in input ){			// to analyze data O(N)				
+					var value='';			
+					for( ; e[counter]!='=' ; counter++ );
+					counter++;			
+					for( ; e[counter]!='&' && counter!=e.length ; counter++ ){				
+						input[key]+=e[counter];				
+					}
+				}
+				
+				trigger = window.setInterval(getData, 1000 );
+				if( input.id != userId ) return;
+				
+				implementData();
+				//printData( input );					
+			});
+
+		
+		}
+		
+		function printData( input ){		// to print value in object input O(N)
+		
+			for( key in input ) console.log( key+'= '+input[key] );
+		}
+		
+		window.onload = function () {
+			
+			alert('請先註冊使用者名稱，若以註冊完成，則請輸入使用者名稱');
+			drawRGBChart();
+			drawTempChart();
+			drawHumidChart();
+			document.getElementById('led-bar').style.backgroundColor = "#FFF4C1";
+			
+        }
+		
+		
+	</script>
+		
+</head>
+
+<body>
+
+	<div class="format">
+		
+		<h1>睿揚 雲端物聯網監控介面<font size="5" face="serif"><I> RP IoT-Cloud Monitor </I></font> </h1>
+	</div>
+	
+	<div class="table-format">
+		
+		<!-- input-box -->
+		<div class="input-box">
+			<span style="font-family:DFKai-sb;" >輸入使用者名稱:</span>
+			<input type="text" id='enterId_input'/>
+			<input type='button' name='enterId_button' value='確定' style="font-family:DFKai-sb;" onclick='enterId();' />
+			<input type='button' name='registerId_button' value='註冊' style="font-family:DFKai-sb;" onclick='registerId();' />
+			
+			<span style="font-family:DFKai-sb;">&nbsp;&nbsp;使用者名稱: </span>
+			<span id="presentId" style="font-family:DFKai-sb;">請先註冊使用者名稱，若以註冊完成，則請輸入使用者名稱</span>
+			
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp
+			<input type='button' name='buttonList' value='顯示目前使用者名單' onclick='listId();' />
+		</div>
+		<!-- end input-box -->
+		
+		<div class="table-box">
+			<table border = "1" border-collapse:collapse style="width:100%">
+				
+				<tr>
+					<th align="left"><span >&nbsp;蜂鳴器Buzzer   <img src="img/buzzer.jpg" width="20" height="20" ><span> </th>
+					<th align="center" id="buzzer_value"><span>  NULL<span></th>
+
+				</tr>
+				
+
+			</table>
+		</div>
+		
+		<div class="table-box">
+		
+			<table border = "1" border-collapse:collapse style="width:100%;">
+				
+				<tr>
+					<th align="left"><span>&nbsp;超音波Sonar (cm) <span> </th>
+					<th align="center" id="sonar_value"><span>  NULL<span></th>
+
+				</tr>
+				
+
+			</table>
+		</div>
+		
+		<div class="table-box">
+		
+			<table border = "1" border-collapse:collapse style="width:100%;">
+				
+				<tr>
+					<th align="left"><span>&nbsp;開關Relay (1/0) <span> </th>
+					<th align="center" id="relay_value"><span>  NULL <span></th>
+				</tr>
+				
+
+			</table>
+		</div>
+		
+	</div>
+		
+	<div class="main">
+		<!-- rgb -->
+		<div class="chart-box">
+	
+		<div class="chart-header ">
+			<span>目前的值</span>
+			<h3 class="title">RGB LED</h3>
+			<div style="background-color:#FFD382;", id="led-bar"; ">&nbsp;&nbsp;&nbsp;</div>
+
+		</div>
+
+		<div class="chart-body">
+			<canvas id="rgbChart"></canvas>
+			<script>
+			
+				function drawRGBChart(){
+				
+					var ctx = document.getElementById('rgbChart');
+					var chart = new Chart(ctx, {
+						type: 'bar',
+						clip:{
+						
+							top:255,
+							bottom:0
+						},
+						data: {
+						  labels: colorLabel, //顯示區間名稱
+						  datasets: [{
+							label: "單位:色碼值", // tootip 出現的名稱
+							data: [input.rgbr, input.rgbg, input.rgbb ], // 資料
+							backgroundColor: [
+							  'rgba(255,99,132,0.2)',
+							  'rgba(75, 192, 192, 0.2)',
+							  'rgba(54, 162, 235, 0.2)',
+							
+							],
+							borderColor: [
+							  'rgba(255,99,132,1)',
+							  'rgba(75, 192, 192, 1)',
+							  'rgba(54, 162, 235, 1)',
+							],
+							borderWidth: 1,
+						  }]
+						},
+						options: {
+							tooltip:{
+								enabled:false
+							},
+							yAxes: [{
+							  gridLines: {
+								color: 'rgba(255, 255, 255, 0.1)' // Y軸 線條顏色 
+							  },
+							  ticks: {
+								fontColor: "#CCC", // Y軸 文字顏色 
+								//beginAtZero: true, // Y軸 從0開始
+							  },
+							}]
+						}
+					});
+				
+				}
+			</script>
+      </div>
+      <!-- end chart-body -->
+
+    </div>
+    <!-- end chart-box -->
+	
+	<!-- 3 -->
+	<div class="chart-box dark">
+	
+		<div class="chart-header dark ">
+			<span>最新10筆資料</span>
+			<h3 class="title" id="humid_title">濕度 Humid</h3>
+
+		</div>
+
+		<div class="chart-body">
+			<canvas id="humidChart"></canvas>
+			<script>
+				
+				function drawHumidChart(){
+					
+					var ctx = document.getElementById('humidChart');
+					var myChart = new Chart(ctx, {
+						type: 'line',
+						data: {
+						  labels: ['1','2','3','4','5','6','7','8','9','10'],
+						  datasets: [{
+							backgroundColor: 'rgba(54, 162, 235, 0.2)',
+							borderColor: 'rgba(54, 162, 235, 1)',
+							borderWidth: 3,
+							label: '單位:%',
+							data: humidQueue,
+							fill: true, // 是否填滿色彩
+							pointStyle: 'rect', // 點點樣式
+							pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+						  }]
+						},
+						options: {
+						  legend: {
+							labels: {
+							  fontColor: 'white' // 標籤顏色 
+							}
+						  },
+						  scales: {
+							xAxes: [{
+							  gridLines: {
+								display: false, // X軸 線條不顯示 
+							  },
+							  ticks: {
+								fontColor: "#CCC" // X軸 文字顏色 
+							  },
+							}],
+							yAxes: [{
+							  gridLines: {
+								color: 'rgba(255, 255, 255, 0.1)' // Y軸 線條顏色 
+							  },
+							  ticks: {
+								fontColor: "#CCC", // Y軸 文字顏色 
+								//beginAtZero: true // Y軸 從0開始
+							  },
+							}]
+						  }
+						}
+					});
+				}
+				
+        </script>
+      </div>
+      <!-- end chart-body -->
+
+    </div>
+    <!-- end chart-box -->
+	
+	<!-- temp -->
+    <div class="chart-box">
+
+		<div class="chart-header">
+			<span>最新10筆資料</span>
+			<h3 class="title" id="temp_title" >溫度 Temperature</h3>
+
+		</div>
+
+		<div class="chart-body">
+			<canvas id="tempChart"></canvas>
+			<script>
+			
+				function drawTempChart(){
+					var ctx = document.getElementById('tempChart');
+					var myChart = new Chart(ctx, {
+						type: 'line',
+						data: {
+						  labels: ['1','2','3','4','5','6','7','8','9','10'],
+						  datasets: [{
+							backgroundColor: 'rgba(54, 162, 235, 0.2)',
+							borderColor: 'rgba(54, 162, 235, 1)',
+							borderWidth: 3,
+							label: '單位:°C',
+							data: tempQueue,
+							fill: true, // 是否填滿色彩
+							pointStyle: 'rect', // 點點樣式
+							pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+						  }]
+						},
+						options: {
+						  legend: {
+							labels: {
+							  fontColor: '#333333' // 標籤顏色 
+							}
+						  },
+						  scales: {
+							xAxes: [{
+							  gridLines: {
+								color: '#F2F2F2' // X軸 線條顏色
+							  },
+							  ticks: {
+								fontColor: "#CCC" // X軸 文字顏色 
+							  },
+							}],
+							yAxes: [{
+							  gridLines: {
+								color: '#F2F2F2' // Y軸 線條顏色 
+							  },
+							  ticks: {
+								fontColor: "#CCC", // Y軸 文字顏色 
+								//beginAtZero: true // Y軸 從0開始
+							  },
+							}]
+						  }
+						}
+					});
+				
+				}
+			  
+			</script>
+		</div>
+		<!-- end chart-body -->
+
+    </div>
+    <!-- end chart-box -->
+	
+	<footer class="footer"> <a href:"https://www.realplus.tech/";> <i> - Copyright (c) 2022 Realplus Tech.</i> </a></footer>
+	</div>
+	<!-- end main -->
+	
+
+	
+</body>

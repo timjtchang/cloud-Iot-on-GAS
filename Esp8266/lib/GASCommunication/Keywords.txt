@@ -1,0 +1,26 @@
+#######################################
+# Syntax Coloring Map For RPHandWashingLib
+#######################################
+
+#######################################
+# Datatypes  (KEYWORD1)
+#######################################
+
+GASCommunication		KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+connectWifi			KEYWORD2
+setId				KEYWORD2
+
+setGAS				KEYWORD2
+pubData				KEYWORD2
+
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+
